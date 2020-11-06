@@ -1,0 +1,281 @@
+No index: -> simple scaning of tables is used. average execution time for provided test queries.
+
+a) explain analyze select * from students where name = 'Tom';
+
+Bitmap Heap Scan on students  (cost=4.52..52.74 rows=13 width=68) (actual time=0.025..0.034 rows=10 loops=1)
+  Recheck Cond: ((name)::text = 'Tom'::text)
+  Heap Blocks: exact=10
+  ->  Bitmap Index Scan on students_name_surname_key  (cost=0.00..4.52 rows=13 width=0) (actual time=0.009..0.009 rows=10 loops=1)
+        Index Cond: ((name)::text = 'Tom'::text)
+Planning Time: 0.131 ms
+Execution Time: 0.047 ms
+
+
+b) explain analyze select * from students where surname like 'V%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=3061 width=68) (actual time=0.013..7.612 rows=3088 loops=1)
+  Filter: ((surname)::text ~~ 'V%'::text)
+  Rows Removed by Filter: 97912
+Planning Time: 0.060 ms
+Execution Time: 7.701 ms
+
+
+c) explain analyze select * from students where phone like '+180011%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=10 width=68) (actual time=0.036..9.514 rows=679 loops=1)
+  Filter: ((phone)::text ~~ '+180011%'::text)
+  Rows Removed by Filter: 100321
+Planning Time: 0.065 ms
+Execution Time: 9.545 ms
+
+
+d) explain analyze select students.id, students.name, students.surname, subjects.subject_name, results.mark
+   from students
+   left join results on students.id = results.student
+   left join subjects on subjects.id = results.subject
+   where surname like 'Vi%';
+
+Gather  (cost=1003.67..13167.17 rows=10200 width=39) (actual time=0.239..12.624 rows=9520 loops=1)
+  Workers Planned: 1
+  Workers Launched: 1
+  ->  Hash Left Join  (cost=3.67..11147.17 rows=6000 width=39) (actual time=0.093..7.915 rows=4760 loops=2)
+        Hash Cond: (results.subject = subjects.id)
+        ->  Nested Loop Left Join  (cost=0.42..11127.50 rows=6000 width=26) (actual time=0.027..7.043 rows=4760 loops=2)
+              ->  Parallel Seq Scan on students  (cost=0.00..2017.65 rows=600 width=18) (actual time=0.015..4.334 rows=476 loops=2)
+                    Filter: ((surname)::text ~~ 'Vi%'::text)
+                    Rows Removed by Filter: 50024
+              ->  Index Scan using results_student_subject_key on results  (cost=0.42..15.08 rows=10 width=12) (actual time=0.003..0.004 rows=10 loops=952)
+                    Index Cond: (student = students.id)
+        ->  Hash  (cost=2.00..2.00 rows=100 width=21) (actual time=0.034..0.035 rows=100 loops=2)
+              Buckets: 1024  Batches: 1  Memory Usage: 14kB
+              ->  Seq Scan on subjects  (cost=0.00..2.00 rows=100 width=21) (actual time=0.009..0.018 rows=100 loops=2)
+Planning Time: 0.239 ms
+Execution Time: 12.889 ms
+
+
+B-tree index -> not much difference from previous test. Index is not always used by optimizer in execution plan.
+13 MB
+
+a) explain analyze select * from students where name = 'Tom';
+
+Bitmap Heap Scan on students  (cost=4.39..52.62 rows=13 width=68) (actual time=0.018..0.028 rows=10 loops=1)
+  Recheck Cond: ((name)::text = 'Tom'::text)
+  Heap Blocks: exact=10
+  ->  Bitmap Index Scan on students_name_idx  (cost=0.00..4.39 rows=13 width=0) (actual time=0.013..0.013 rows=10 loops=1)
+        Index Cond: ((name)::text = 'Tom'::text)
+Planning Time: 0.107 ms
+Execution Time: 0.042 ms
+
+b) explain analyze select * from students where surname like 'V%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=3061 width=68) (actual time=0.009..7.701 rows=3088 loops=1)
+  Filter: ((surname)::text ~~ 'V%'::text)
+  Rows Removed by Filter: 97912
+Planning Time: 0.048 ms
+Execution Time: 7.788 ms
+
+c) explain analyze select * from students where phone like '+180011%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=10 width=68) (actual time=0.018..8.778 rows=679 loops=1)
+  Filter: ((phone)::text ~~ '+180011%'::text)
+  Rows Removed by Filter: 100321
+Planning Time: 0.060 ms
+Execution Time: 8.806 ms
+
+d) explain analyze select students.id, students.name, students.surname, subjects.subject_name, results.mark
+   from students
+   left join results on students.id = results.student
+   left join subjects on subjects.id = results.subject
+   where surname like 'Vi%';
+
+
+Gather  (cost=1003.67..13167.17 rows=10200 width=39) (actual time=0.248..12.140 rows=9520 loops=1)
+  Workers Planned: 1
+  Workers Launched: 1
+  ->  Hash Left Join  (cost=3.67..11147.17 rows=6000 width=39) (actual time=0.106..7.543 rows=4760 loops=2)
+        Hash Cond: (results.subject = subjects.id)
+        ->  Nested Loop Left Join  (cost=0.42..11127.50 rows=6000 width=26) (actual time=0.034..6.735 rows=4760 loops=2)
+              ->  Parallel Seq Scan on students  (cost=0.00..2017.65 rows=600 width=18) (actual time=0.011..4.137 rows=476 loops=2)
+                    Filter: ((surname)::text ~~ 'Vi%'::text)
+                    Rows Removed by Filter: 50024
+              ->  Index Scan using results_student_subject_key on results  (cost=0.42..15.08 rows=10 width=12) (actual time=0.003..0.004 rows=10 loops=952)
+                    Index Cond: (student = students.id)
+        ->  Hash  (cost=2.00..2.00 rows=100 width=21) (actual time=0.030..0.030 rows=100 loops=2)
+              Buckets: 1024  Batches: 1  Memory Usage: 14kB
+              ->  Seq Scan on subjects  (cost=0.00..2.00 rows=100 width=21) (actual time=0.010..0.016 rows=100 loops=2)
+Planning Time: 0.206 ms
+Execution Time: 12.424 ms
+
+
+
+Hash index -> a bit better for some simple querries. Not always used used by optimizer in execution plan.
+19 MB
+
+a) explain analyze select * from students where name = 'Tom';
+
+Bitmap Heap Scan on students  (cost=4.10..52.33 rows=13 width=68) (actual time=0.013..0.024 rows=10 loops=1)
+  Recheck Cond: ((name)::text = 'Tom'::text)
+  Heap Blocks: exact=10
+  ->  Bitmap Index Scan on students_name_hash  (cost=0.00..4.10 rows=13 width=0) (actual time=0.007..0.007 rows=10 loops=1)
+        Index Cond: ((name)::text = 'Tom'::text)
+Planning Time: 0.094 ms
+Execution Time: 0.037 ms
+
+b) explain analyze select * from students where surname like 'V%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=3061 width=68) (actual time=0.010..7.756 rows=3088 loops=1)
+  Filter: ((surname)::text ~~ 'V%'::text)
+  Rows Removed by Filter: 97912
+Planning Time: 0.049 ms
+Execution Time: 7.839 ms
+
+c) explain analyze select * from students where phone like '+180011%';
+
+Seq Scan on students  (cost=0.00..2537.50 rows=10 width=68) (actual time=0.018..8.893 rows=679 loops=1)
+  Filter: ((phone)::text ~~ '+180011%'::text)
+  Rows Removed by Filter: 100321
+Planning Time: 0.061 ms
+Execution Time: 8.922 ms
+
+d) explain analyze select students.id, students.name, students.surname, subjects.subject_name, results.mark
+   from students
+   left join results on students.id = results.student
+   left join subjects on subjects.id = results.subject
+   where surname like 'Vi%';
+
+Gather  (cost=1003.67..13167.17 rows=10200 width=39) (actual time=0.222..18.362 rows=9520 loops=1)
+  Workers Planned: 1
+  Workers Launched: 1
+  ->  Hash Left Join  (cost=3.67..11147.17 rows=6000 width=39) (actual time=0.021..6.687 rows=4760 loops=2)
+        Hash Cond: (results.subject = subjects.id)
+        ->  Nested Loop Left Join  (cost=0.42..11127.50 rows=6000 width=26) (actual time=0.008..5.949 rows=4760 loops=2)
+              ->  Parallel Seq Scan on students  (cost=0.00..2017.65 rows=600 width=18) (actual time=0.004..3.805 rows=476 loops=2)
+                    Filter: ((surname)::text ~~ 'Vi%'::text)
+                    Rows Removed by Filter: 50024
+              ->  Index Scan using results_student_subject_key on results  (cost=0.42..15.08 rows=10 width=12) (actual time=0.002..0.003 rows=10 loops=952)
+                    Index Cond: (student = students.id)
+        ->  Hash  (cost=2.00..2.00 rows=100 width=21) (actual time=0.021..0.022 rows=100 loops=1)
+              Buckets: 1024  Batches: 1  Memory Usage: 14kB
+              ->  Seq Scan on subjects  (cost=0.00..2.00 rows=100 width=21) (actual time=0.004..0.010 rows=100 loops=1)
+Planning Time: 0.204 ms
+Execution Time: 18.641 ms
+
+
+
+
+Gin index -> showed high performance in queries where search is done by text fields.
+15 MB
+
+a) explain analyze select * from students where name = 'Tom';
+
+Bitmap Heap Scan on students  (cost=4.52..52.74 rows=13 width=68) (actual time=0.018..0.027 rows=10 loops=1)
+  Recheck Cond: ((name)::text = 'Tom'::text)
+  Heap Blocks: exact=10
+  ->  Bitmap Index Scan on students_name_surname_key  (cost=0.00..4.52 rows=13 width=0) (actual time=0.013..0.014 rows=10 loops=1)
+        Index Cond: ((name)::text = 'Tom'::text)
+Planning Time: 0.054 ms
+Execution Time: 0.058 ms
+
+b) explain analyze select * from students where surname like 'V%';
+
+Bitmap Heap Scan on students  (cost=39.72..1352.98 rows=3061 width=68) (actual time=0.335..1.537 rows=3088 loops=1)
+  Recheck Cond: ((surname)::text ~~ 'V%'::text)
+  Heap Blocks: exact=1157
+  ->  Bitmap Index Scan on students_surname_gin  (cost=0.00..38.95 rows=3061 width=0) (actual time=0.234..0.234 rows=3088 loops=1)
+        Index Cond: ((surname)::text ~~ 'V%'::text)
+Planning Time: 0.062 ms
+Execution Time: 1.624 ms
+
+c) explain analyze select * from students where phone like '+180011%';
+
+Bitmap Heap Scan on students  (cost=52.08..89.55 rows=10 width=68) (actual time=2.663..3.084 rows=679 loops=1)
+  Recheck Cond: ((phone)::text ~~ '+180011%'::text)
+  Rows Removed by Index Recheck: 35
+  Heap Blocks: exact=549
+  ->  Bitmap Index Scan on students_phone_gin  (cost=0.00..52.08 rows=10 width=0) (actual time=2.614..2.614 rows=714 loops=1)
+        Index Cond: ((phone)::text ~~ '+180011%'::text)
+Planning Time: 0.065 ms
+Execution Time: 3.116 ms
+
+d) explain analyze select students.id, students.name, students.surname, subjects.subject_name, results.mark
+   from students
+   left join results on students.id = results.student
+   left join subjects on subjects.id = results.subject
+   where surname like 'Vi%';
+
+Gather  (cost=1003.67..13167.17 rows=10200 width=39) (actual time=0.324..12.472 rows=9520 loops=1)
+  Workers Planned: 1
+  Workers Launched: 1
+  ->  Hash Left Join  (cost=3.67..11147.17 rows=6000 width=39) (actual time=0.108..7.562 rows=4760 loops=2)
+        Hash Cond: (results.subject = subjects.id)
+        ->  Nested Loop Left Join  (cost=0.42..11127.50 rows=6000 width=26) (actual time=0.028..6.739 rows=4760 loops=2)
+              ->  Parallel Seq Scan on students  (cost=0.00..2017.65 rows=600 width=18) (actual time=0.016..4.132 rows=476 loops=2)
+                    Filter: ((surname)::text ~~ 'Vi%'::text)
+                    Rows Removed by Filter: 50024
+              ->  Index Scan using results_student_subject_key on results  (cost=0.42..15.08 rows=10 width=12) (actual time=0.003..0.004 rows=10 loops=952)
+                    Index Cond: (student = students.id)
+        ->  Hash  (cost=2.00..2.00 rows=100 width=21) (actual time=0.040..0.040 rows=100 loops=2)
+              Buckets: 1024  Batches: 1  Memory Usage: 14kB
+              ->  Seq Scan on subjects  (cost=0.00..2.00 rows=100 width=21) (actual time=0.010..0.020 rows=100 loops=2)
+Planning Time: 0.329 ms
+Execution Time: 12.747 ms
+
+
+
+Gist index -> heavier and bit slower than gin, but faster rebuided during data insert and update.
+27 MB
+
+a) explain analyze select * from students where name = 'Tom';
+
+Bitmap Heap Scan on students  (cost=4.52..52.74 rows=13 width=68) (actual time=0.014..0.023 rows=10 loops=1)
+  Recheck Cond: ((name)::text = 'Tom'::text)
+  Heap Blocks: exact=10
+  ->  Bitmap Index Scan on students_name_surname_key  (cost=0.00..4.52 rows=13 width=0) (actual time=0.010..0.011 rows=10 loops=1)
+        Index Cond: ((name)::text = 'Tom'::text)
+Planning Time: 0.112 ms
+Execution Time: 0.053 ms
+
+b) explain analyze select * from students where surname like 'V%';
+
+Bitmap Heap Scan on students  (cost=124.00..1437.27 rows=3061 width=68) (actual time=4.757..5.914 rows=3088 loops=1)
+  Recheck Cond: ((surname)::text ~~ 'V%'::text)
+  Heap Blocks: exact=1157
+  ->  Bitmap Index Scan on students_surname_gist  (cost=0.00..123.24 rows=3061 width=0) (actual time=4.659..4.659 rows=3088 loops=1)
+        Index Cond: ((surname)::text ~~ 'V%'::text)
+Planning Time: 0.074 ms
+Execution Time: 6.004 ms
+
+c) explain analyze select * from students where phone like '+180011%';
+
+Bitmap Heap Scan on students  (cost=4.36..41.83 rows=10 width=68) (actual time=4.951..5.419 rows=679 loops=1)
+  Recheck Cond: ((phone)::text ~~ '+180011%'::text)
+  Rows Removed by Index Recheck: 35
+  Heap Blocks: exact=549
+  ->  Bitmap Index Scan on students_phone_gist  (cost=0.00..4.36 rows=10 width=0) (actual time=4.902..4.902 rows=714 loops=1)
+        Index Cond: ((phone)::text ~~ '+180011%'::text)
+Planning Time: 0.053 ms
+Execution Time: 5.457 ms
+
+d) explain analyze select students.id, students.name, students.surname, subjects.subject_name, results.mark
+   from students
+   left join results on students.id = results.student
+   left join subjects on subjects.id = results.subject
+   where surname like 'Vi%';
+   
+Gather  (cost=1003.67..13167.17 rows=10200 width=39) (actual time=0.216..12.407 rows=9520 loops=1)
+  Workers Planned: 1
+  Workers Launched: 1
+  ->  Hash Left Join  (cost=3.67..11147.17 rows=6000 width=39) (actual time=0.085..7.688 rows=4760 loops=2)
+        Hash Cond: (results.subject = subjects.id)
+        ->  Nested Loop Left Join  (cost=0.42..11127.50 rows=6000 width=26) (actual time=0.026..6.892 rows=4760 loops=2)
+              ->  Parallel Seq Scan on students  (cost=0.00..2017.65 rows=600 width=18) (actual time=0.010..4.196 rows=476 loops=2)
+                    Filter: ((surname)::text ~~ 'Vi%'::text)
+                    Rows Removed by Filter: 50024
+              ->  Index Scan using results_student_subject_key on results  (cost=0.42..15.08 rows=10 width=12) (actual time=0.003..0.004 rows=10 loops=952)
+                    Index Cond: (student = students.id)
+        ->  Hash  (cost=2.00..2.00 rows=100 width=21) (actual time=0.028..0.029 rows=100 loops=2)
+              Buckets: 1024  Batches: 1  Memory Usage: 14kB
+              ->  Seq Scan on subjects  (cost=0.00..2.00 rows=100 width=21) (actual time=0.008..0.015 rows=100 loops=2)
+Planning Time: 0.342 ms
+Execution Time: 12.709 ms
+
